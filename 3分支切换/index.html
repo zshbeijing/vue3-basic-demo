@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+
+<body>
+  <div class="one"></div>
+  <div class="two"></div>
+  <button class="btn"></button>
+</body>
+
+<script>
+  // 存储副作用函数的桶
+  let bucket = new WeakMap()
+  // 当前激活的副作用函数
+  let activeEffect
+
+  function Effect(fn) {
+    const effectFn = () => {
+      cleanUp(effectFn)
+      activeEffect = effectFn
+      fn()
+    }
+    effectFn.deps = []
+    effectFn()
+  }
+
+  function cleanUp(effectFn) {
+    for (let i = 0 ; i < effectFn.deps.length ; i ++) {
+      let item = effectFn.deps[i]
+      item.delete(effectFn)
+    }
+    effectFn.deps.length = 0
+  }
+
+  const data = { one: "who are you", two: "why is here" }
+  const obj = new Proxy(data, {
+    get(target,key) {
+      track(target,key)
+      return target[key]
+    },
+    set(target,key,newVal) {
+      target[key] = newVal
+      trigger(target,key)
+    }
+  })
+
+  function track(target,key) {
+    if (!activeEffect) return
+    let depsMap = bucket.get(target)
+    if (!depsMap) {
+      bucket.set(target,depsMap = new Map())
+    }
+    let deps = depsMap.get(key)
+    if (!deps) {
+      depsMap.set(key, deps = new Set())
+    }
+    deps.add(activeEffect)
+  }
+
+  function trigger(target,key) {
+    
+  }
+
+</script>
+
+</html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>执行调度</title>
+</head>
+<body>
+  <div class="one"></div>
+  <div class="two"></div>
+  <div class="three"></div>
+  <div class="num"></div>
+  <button class="btn">change</button>
+</body>
+<script>
+
+const data = { text: "who are you" , num: 0, two: "why is here",three: "where will yu go" }
+
+const obj = new Proxy(data, {
+  get(target,key) {
+    track(target,key)
+    return target[key]
+  },
+  set(target,key,newVal) {
+    target[key] = newVal
+    trigger(target,key)
+  }
+})
+
+let bucket = new WeakMap()
+let effectStack = []
+let activeEffect
+
+function Effect (fn, options = {}) {
+  const effectFn = () => {
+    cleanUp(effectFn)
+    activeEffect = effectFn
+    effectStack.push(effectFn)
+    fn()
+    effectStack.pop()
+    activeEffect = effectStack[effectStack.length -1]
+  }
+  effectFn.deps = []
+  effectFn.options = options
+  effectFn()
+}
+
+function cleanUp(effectFn) {
+  for(let i = 0; i < effectFn.deps.length ; i ++) {
+    let item = effectFn.deps[i]
+    item.delete(effectFn)
+  }
+  effectFn.deps.length = 0
+}
+
+function track(target,key) {
+  if (!activeEffect) return 
+  console.log("track");
+  let depsMap = bucket.get(target)
+  if (!depsMap) {
+    bucket.set(target, depsMap = new Map())
+  }
+  let deps = depsMap.get(key)
+  if (!deps) {
+    depsMap.set(key,deps = new Set())
+  }
+  deps.add(activeEffect)
+  activeEffect.deps.push(deps)
+}
+
+function trigger(target,key) {
+  console.log("trigger");
+  let depsMap = bucket.get(target)
+  if (!depsMap) return
+  let deps = depsMap.get(key)
+  if (!deps) return
+  let newSet = []
+  deps.forEach(fn => {
+    if (fn !== activeEffect) {
+      newSet.push(fn)
+    }
+  })
+  newSet.forEach(fn => {
+    if (fn.options.scheduler) {
+      fn.options.scheduler(fn)
+    } else {
+      fn()
+    }
+  })
+} 
+
+function effect() {
+  document.querySelector(".one").innerText = obj.text
+}
+
+function effectFn1() {
+  console.log("effectFn1执行了");
+  Effect(effectFn2)
+  function effectFn2 () {
+    console.log("effectFn2执行了");
+    document.querySelector('.three').innerText = obj.three
+  }
+  document.querySelector(".two").innerText = obj.two
+}
+
+function effectFn3() {
+  
+}
+
+// Effect(effect)
+// Effect(effectFn1)
+
+const jobQueue = new Set()
+const p = Promise.resolve()
+let isFlushing = false
+function flushJob() {
+  if (isFlushing) return
+  isFlushing = true
+  p.then(() => {
+    jobQueue.forEach(job => job())
+  }).finally(() => {
+    isFlushing = false
+  })
+}
+
+
+Effect(() => {  console.log("num console >>>>",obj.num); }, {
+  scheduler (fn) {
+    jobQueue.add(fn)
+    flushJob()
+  }
+})
+obj.num++
+obj.num++
+console.log("结束了");
+const btn = document.querySelector('.btn')
+btn.addEventListener("click", () => {
+  // obj.text = "I am destiny"
+  // obj.two = "waste time"
+  obj.num ++
+})
+
+
+
+</script>
+</html>
