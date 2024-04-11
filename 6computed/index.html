@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>comp</title>
+</head>
+
+<body>
+  <div class="num"></div>
+  <button class="btn">change</button>
+</body>
+<script>
+
+  const data = { text: "who are you", num: 0, two: "why is here", three: "where will yu go", tall: 200 }
+
+  const obj = new Proxy(data, {
+    get (target, key) {
+      track(target, key)
+      return target[key]
+    },
+    set (target, key, newVal) {
+      target[key] = newVal
+      trigger(target, key)
+    }
+  })
+
+  let bucket = new WeakMap()
+  let effectStack = []
+  let activeEffect
+
+  function effect (fn, options = {}) {
+    const effectFn = () => {
+      cleanUp(effectFn)
+      activeEffect = effectFn
+      effectStack.push(effectFn)
+      console.log("before")
+      const res = fn()
+      console.log("after")
+      effectStack.pop()
+      activeEffect = effectStack[effectStack.length - 1]
+      return res
+    }
+    effectFn.deps = []
+    effectFn.options = options
+    if (!options.lazy) {
+      effectFn()
+    }
+    return effectFn
+  }
+
+  function cleanUp (effectFn) {
+    for (let i = 0; i < effectFn.deps.length; i++) {
+      let item = effectFn.deps[i]
+      item.delete(effectFn)
+    }
+    effectFn.deps.length = 0
+  }
+
+  function track (target, key) {
+    if (!activeEffect) return
+    let depsMap = bucket.get(target)
+    if (!depsMap) {
+      bucket.set(target, depsMap = new Map())
+    }
+    let deps = depsMap.get(key)
+    if (!deps) {
+      depsMap.set(key, deps = new Set())
+    }
+    deps.add(activeEffect)
+    activeEffect.deps.push(deps)
+  }
+
+  function trigger (target, key) {
+    let depsMap = bucket.get(target)
+    if (!depsMap) return
+    let deps = depsMap.get(key)
+    if (!deps) return
+    let newSet = []
+    deps.forEach(fn => {
+      if (fn !== activeEffect) {
+        newSet.push(fn)
+      }
+    })
+    newSet.forEach(fn => {
+      if (fn.options.scheduler) {
+        fn.options.scheduler(fn)
+      } else {
+        fn()
+      }
+    })
+  }
+
+  const computed = (getter) => {
+    // 存储上一次计算值
+    let val
+    // 当dirty为true意味着需要重新计算
+    let dirty = true
+    const effectFn = effect(getter,
+      {
+        lazy: true,
+        scheduler () {
+          if (!dirty) {
+            dirty = true
+            trigger(obj, "value")
+          }
+        }
+      }
+    )
+    const obj = {
+      get value () {
+        if (dirty) {
+          val = effectFn()
+          dirty = false
+          track(obj, "value")
+        }
+        return val
+      }
+    }
+    return obj
+  }
+
+  const newObj = computed(() => obj.tall + obj.num)
+  console.log("newObj", newObj.value)
+  obj.num = 100
+  console.log("newObj", newObj.value)
+  console.log("newObj", newObj.value)
+  console.log("newObj", newObj.value)
+
+
+
+
+
+</script>
+
+</html>

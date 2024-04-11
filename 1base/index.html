@@ -1,41 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>响应式的基本实现</title>
 </head>
+
 <body>
   <div class="one"></div>
   <button class="btn">change</button>
 </body>
 <script>
-// 存储副作用函数的桶
-let bucket = new Set()
+  // 存储副作用函数的桶
+  let bucket = new Set()
 
-const data = { text: "who are you" }
-const obj = new Proxy(data, {
-  get (target,key) {
-    bucket.add(effect)
-    return target[key]
-  },
-  set (target,key,newVal) {
-    target[key] = newVal
-    bucket.forEach(fn => fn())
+  const data = { text: "who are you" }
+  const obj = new Proxy(data, {
+    get (target, key) {
+      bucket.add(effect)
+      return target[key]
+    },
+    set (target, key, newVal) {
+      target[key] = newVal
+      bucket.forEach(fn => fn())
+    }
+  })
+
+  function effect () {
+    document.querySelector('.one').innerText = obj.text
   }
-})
 
-function effect() {
-  document.querySelector('.one').innerText = obj.text
-}
+  const btn = document.querySelector('.btn')
+  btn.addEventListener("click", () => {
+    obj.text = "I am shy boy"
+  })
 
-const btn = document.querySelector('.btn')
-btn.addEventListener("click", () => {
-  obj.text = "I am shy boy"
-})
-
-effect()
+  effect()
 
 </script>
+
 </html>

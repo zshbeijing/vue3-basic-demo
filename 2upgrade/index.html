@@ -31,8 +31,8 @@
   })
 
   // 注册副作用函数并执行
-  function Effect (fn) {
-    console.log("Effect")
+  function effect (fn) {
+    console.log("effect")
     activeEffect = fn
     fn()
   }
@@ -59,11 +59,11 @@
     deps && deps.forEach(fn => fn())
   }
 
-  function effect () {
+  function fn () {
     document.querySelector('.one').innerText = obj.text
   }
 
-  Effect(effect)
+  effect(fn)
 
   const btn = document.querySelector('.btn')
   btn.addEventListener("click", () => {
